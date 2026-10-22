@@ -53,7 +53,12 @@ public sealed class FakeInput : ISecretInput
 {
     private readonly string? _value;
     public FakeInput(string? value) => _value = value;
-    public byte[]? ReadSecret(string reference, string? label) => _value == null ? null : Encoding.UTF8.GetBytes(_value);
+    public string? LastReason { get; private set; }
+    public byte[]? ReadSecret(string reference, string? label, string? reason = null)
+    {
+        LastReason = reason;
+        return _value == null ? null : Encoding.UTF8.GetBytes(_value);
+    }
 }
 
 public sealed class FakeClipboard : IClipboard

@@ -62,6 +62,14 @@ This is the key limitation. Claude Code (or any agent) runs under your Windows a
 - If Windows Hello is reset (PIN reset that removes keys, TPM cleared, Windows reinstalled) the Hello key is lost and **the vault cannot be opened**. There is no recovery key in this MVP. Keep your own backup of important secrets elsewhere.
 - No network code exists in the program. Verify by reading the source; build it yourself with `dotnet publish`.
 
+## MCP mode (`svault mcp`)
+
+- Same rules as the CLI: no tool returns a value; `vault_run` / `vault_render` / `vault_add` each show a dialog and ask for Windows Hello. Nothing is cached between calls.
+- Still no network: MCP runs over stdin/stdout of a local process started by the Claude app.
+- The child of `vault_run` gets a closed stdin, so it cannot read or inject into the MCP channel.
+- `vault_add` lets an agent *ask* for a secret. A malicious or confused agent could ask for something it should not have (for example your bank password). Read the reason in the dialog; cancel if it does not make sense. Replacing an existing value needs `replace` and the dialog says so.
+- Output of `vault_run` is masked and capped at 100,000 characters per stream.
+
 ## Out of scope for the MVP
 
 Recovery keys, multiple devices, secret rotation, removing entries, running the agent as a separate Windows user (which would give a real OS boundary and is the recommended future hardening).

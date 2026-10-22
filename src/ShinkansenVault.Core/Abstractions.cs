@@ -33,8 +33,11 @@ public interface IConsentPrompt
 /// <summary>Reads a new secret value from the human (GUI dialog). Never from args or agent stdin.</summary>
 public interface ISecretInput
 {
-    /// <summary>Returns the UTF-8 bytes of the value, or null if cancelled. Caller zeroes the array.</summary>
-    byte[]? ReadSecret(string reference, string? label);
+    /// <summary>
+    /// Returns the UTF-8 bytes of the value, or null if cancelled. Caller zeroes the array.
+    /// <paramref name="reason"/> is shown when an agent asked for the secret (MCP vault_add).
+    /// </summary>
+    byte[]? ReadSecret(string reference, string? label, string? reason = null);
 }
 
 public interface IClipboard

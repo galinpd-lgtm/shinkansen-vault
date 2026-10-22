@@ -16,6 +16,7 @@ internal static class Program
           svault render <template> <output> --reason "text"
           svault clip <vault://ref> --reason "text"                  (clears after 20 s)
           svault log [--tail N]
+          svault mcp                                                 (MCP server over stdio for AI agents)
           svault version
 
         Vault folder: %LOCALAPPDATA%\ShinkansenVault (override with SVAULT_HOME).
@@ -85,6 +86,18 @@ internal static class Program
             case "log":
                 Expect(parsed, 0);
                 foreach (var line in audit.ReadLines(parsed.Tail)) Console.WriteLine(line);
+                return 0;
+
+            case "mcp":
+                Expect(parsed, 0);
+                {
+                    // stdout is the protocol channel: UTF-8, no BOM, nothing else written to it.
+                    var utf8 = new System.Text.UTF8Encoding(false);
+                    using var input = new StreamReader(Console.OpenStandardInput(), utf8);
+                    using var output = new StreamWriter(Console.OpenStandardOutput(), utf8) { AutoFlush = true };
+                    var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
+                    await new McpServer(service, audit, new SecretInputDialog(), version).RunAsync(input, output);
+                }
                 return 0;
 
             case "version" or "--version":

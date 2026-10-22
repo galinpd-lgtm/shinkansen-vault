@@ -18,9 +18,13 @@ Short rules for Claude Code and other agents that work with Shinkansen Vault. Co
    ```
    Template placeholders look like `{{vault://varnahub/db}}`. **Do not read the rendered output file afterwards** (no `cat`, `type`, `Read` tool, `git diff`, upload or attach). Only the target program may read it. Never render into the repo or a folder you routinely read; never commit it.
 6. **Clipboard is for the human.** `svault clip vault://ref --reason "..."` is for the human to paste into a browser or app. Do not read the clipboard.
-7. **Adding secrets is the human's job.** Ask: "Please run `svault add vault://x/y --label "..."` and enter the value in the dialog." There is no way to pass a value as an argument or via stdin; don't try.
+7. **Never ask for a secret in chat.** If you need one that `vault_list` / `svault list` doesn't have, call the MCP tool `vault_add` (ref, label, reason): a dialog opens and the human types the value; you get only the reference. Without MCP, ask the human to run `svault add vault://x/y --label "..."`. There is no way to pass a value as an argument or via stdin; don't try.
 8. **If denied (exit code 5), stop and ask.** Do not retry in a loop.
 9. `svault log` shows the audit trail; you may read it (it never contains values).
+
+## MCP tools
+
+When the `shinkansen-vault` MCP server is connected you have `vault_list`, `vault_add`, `vault_run` (`env` map, `command` array — not a shell — and `reason`), `vault_render` and `vault_log`. A result starting with `DENIED:` means the human said no: stop and ask. The dialog may take a while; the human has to read it and enter a PIN.
 
 ## Exit codes
 
@@ -33,4 +37,4 @@ Short rules for Claude Code and other agents that work with Shinkansen Vault. Co
 
 ## Накратко на български
 
-Използвай само референции `vault://...`. Никога не се опитвай да видиш стойност. Винаги давай честна и конкретна `--reason`. Не чети файлове, създадени с `render`. Клипбордът е за човека. Добавянето на тайни е работа на човека. При отказ (код 5) спри и попитай.
+Използвай само референции `vault://...`. Никога не искай пароли в чата — ползвай `vault_add` (MCP) и човекът я въвежда в прозореца. Никога не се опитвай да видиш стойност. Винаги давай честна и конкретна `--reason`. Не чети файлове, създадени с `render`. Клипбордът е за човека. Добавянето на тайни е работа на човека. При отказ (код 5) спри и попитай.

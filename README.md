@@ -24,6 +24,7 @@ Shinkansen Vault (`svault.exe`) е малък трезор за пароли з�
 | `svault run --env ИМЕ=vault://реф [...] --reason "защо" -- команда ...` | След съгласие + Hello пуска командата с тайните в нейната среда. Всяка тайна в изхода се заменя с `••••` (или `****`, ако конзолата не поддържа този знак). |
 | `svault render шаблон изход --reason "защо"` | Заменя `{{vault://реф}}` в шаблона и записва резултата директно във файла. Показва само потвърждение. |
 | `svault clip vault://реф --reason "защо"` | Копира в клипборда за 20 s (за поставяне от човека), после го изчиства. |
+| `svault mcp` | MCP сървър за AI агенти (виж по-долу). |
 | `svault log [--tail N]` | Одитен дневник (JSONL): време, референции, команда/цел, причина, разрешено/отказано. Никога стойности. |
 
 Файлове: `%LOCALAPPDATA%\ShinkansenVault\vault.svlt` и `audit.jsonl` (папката може да се смени с променливата `SVAULT_HOME`).
@@ -62,6 +63,35 @@ dotnet publish src/svault/svault.csproj -c Release -r win-x64 --self-contained t
 
 Правила за агентите: [docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md). Ръчен тест на реален компютър: [docs/MANUAL_TEST.md](docs/MANUAL_TEST.md).
 
+### Връзка с AI агенти (MCP)
+
+`svault mcp` пуска MCP сървър (през stdio), така че всяка сесия на Claude на този компютър вижда трезора като инструменти:
+
+| Инструмент | Какво прави |
+|---|---|
+| `vault_list` | Референции и етикети, без стойности. |
+| `vault_add` | Агентът иска нова тайна: на екрана излиза прозорец, **вие** въвеждате стойността, агентът получава само `vault://...`. |
+| `vault_run` | Като `svault run`: съгласие + Windows Hello, тайните в средата на командата, изходът маскиран. |
+| `vault_render` | Като `svault render`: попълва шаблон във файл, връща само потвърждение. |
+| `vault_log` | Последните записи от одитния дневник. |
+
+Няма инструмент, който връща стойност. Всяко ползване пак иска вашето „Разреши“ и PIN.
+
+Свързване (веднъж, за всички сесии на потребителя):
+
+```powershell
+# Claude Code
+claude mcp add shinkansen-vault --scope user -- "$env:LOCALAPPDATA\Programs\ShinkansenVault\svault.exe" mcp
+```
+
+Claude Desktop — в `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{ "mcpServers": { "shinkansen-vault": { "command": "C:\\Users\\<вие>\\AppData\\Local\\Programs\\ShinkansenVault\\svault.exe", "args": ["mcp"] } } }
+```
+
+Новите MCP връзки се виждат само в **нови** сесии.
+
 ### Лиценз
 
 GPL-3.0 (вижте [LICENSE](LICENSE)).
@@ -88,6 +118,7 @@ Shinkansen Vault (`svault.exe`) is a small Windows password vault unlocked with 
 | `svault run --env NAME=vault://ref [...] --reason "why" -- command ...` | After consent + Hello, runs the command with the secrets in its environment. Any secret in its output is replaced with `••••` (or `****` if the console cannot show that character). |
 | `svault render template output --reason "why"` | Replaces `{{vault://ref}}` placeholders and writes the result straight to the output file. Prints only a confirmation. |
 | `svault clip vault://ref --reason "why"` | Copies to the clipboard for 20 s (for the human to paste), then clears it. |
+| `svault mcp` | MCP server for AI agents (see below). |
 | `svault log [--tail N]` | Audit log (JSONL): time, refs, command/target, reason, approved/denied. Never values. |
 
 Files: `%LOCALAPPDATA%\ShinkansenVault\vault.svlt` and `audit.jsonl` (override the folder with `SVAULT_HOME`).
@@ -125,6 +156,35 @@ Put `publish\svault.exe` in a folder on your `PATH`. GitHub Releases include `SH
 4. The command gets the password in `CPANEL_PASS`; if it prints it, the agent sees `••••`.
 
 Agent rules: [docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md). Manual test on a real PC: [docs/MANUAL_TEST.md](docs/MANUAL_TEST.md).
+
+### Connecting AI agents (MCP)
+
+`svault mcp` runs an MCP server over stdio, so every Claude session on this PC sees the vault as tools:
+
+| Tool | What it does |
+|---|---|
+| `vault_list` | References and labels, no values. |
+| `vault_add` | The agent asks for a new secret: a dialog opens on screen, **you** type the value, the agent gets only `vault://...`. |
+| `vault_run` | Like `svault run`: consent + Windows Hello, secrets in the command's environment, output masked. |
+| `vault_render` | Like `svault render`: fills a template into a file, returns only a confirmation. |
+| `vault_log` | Latest audit log entries. |
+
+No tool returns a value. Every use still needs your "Allow" and PIN.
+
+Connect once for all of the user's sessions:
+
+```powershell
+# Claude Code
+claude mcp add shinkansen-vault --scope user -- "$env:LOCALAPPDATA\Programs\ShinkansenVault\svault.exe" mcp
+```
+
+Claude Desktop — in `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{ "mcpServers": { "shinkansen-vault": { "command": "C:\\Users\\<you>\\AppData\\Local\\Programs\\ShinkansenVault\\svault.exe", "args": ["mcp"] } } }
+```
+
+New MCP servers only show up in **new** sessions.
 
 ### License
 
