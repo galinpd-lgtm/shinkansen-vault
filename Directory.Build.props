@@ -5,7 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Version>0.1.0</Version>
+    <!-- Local builds only; release builds take the version from the git tag (see build.yml). -->
+    <Version>0.1.1</Version>
     <Product>Shinkansen Vault</Product>
   </PropertyGroup>
 </Project>
