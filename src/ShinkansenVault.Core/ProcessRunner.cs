@@ -10,7 +10,8 @@ public static class ProcessRunner
         IReadOnlyDictionary<string, string> environment,
         IReadOnlyCollection<string> secrets,
         TextWriter stdout,
-        TextWriter stderr)
+        TextWriter stderr,
+        bool closeStdin = false)
     {
         if (command.Count == 0) throw new VaultException("No command given after '--'.", ExitCodes.Usage);
         var psi = new ProcessStartInfo(command[0])
@@ -18,7 +19,7 @@ public static class ProcessRunner
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            RedirectStandardInput = false,
+            RedirectStandardInput = closeStdin,
         };
         foreach (var a in command.Skip(1)) psi.ArgumentList.Add(a);
         foreach (var (k, v) in environment) psi.Environment[k] = v;
@@ -35,6 +36,8 @@ public static class ProcessRunner
 
         using (process)
         {
+            // In MCP mode our stdin is the protocol channel: the child must not read it.
+            if (closeStdin) process.StandardInput.Close();
             var outTask = PumpAsync(process.StandardOutput, stdout, secrets);
             var errTask = PumpAsync(process.StandardError, stderr, secrets);
             await process.WaitForExitAsync();

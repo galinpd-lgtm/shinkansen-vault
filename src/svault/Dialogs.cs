@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Forms;
 
@@ -60,12 +61,35 @@ internal sealed class ConsentDialog : IConsentPrompt
         return form.ShowDialog() == DialogResult.OK;
     });
 
-    internal static Form NewForm(string title, int w, int h) => new()
+    internal static Form NewForm(string title, int w, int h)
     {
-        Text = title, Width = w, Height = h, StartPosition = FormStartPosition.CenterScreen,
-        TopMost = true, MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = true,
-        FormBorderStyle = FormBorderStyle.FixedDialog,
-    };
+        var form = new Form
+        {
+            Text = title, Width = w, Height = h, StartPosition = FormStartPosition.CenterScreen,
+            TopMost = true, MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = true,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+        };
+        // Claude starts MCP servers with a "hidden window" startup flag, and Windows applies it to the
+        // first window the process shows, so the dialog would exist but stay invisible. Show it again
+        // explicitly once the modal loop runs; a second ShowWindow call is always honoured.
+        form.Load += (_, _) => form.BeginInvoke(() =>
+        {
+            ShowWindow(form.Handle, SwShowNormal);
+            SetForegroundWindow(form.Handle);
+            form.Activate();
+        });
+        return form;
+    }
+
+    private const int SwShowNormal = 1;
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
 
     internal static void AddButtons(Form form, Control body, Button left, Button right)
     {
@@ -80,11 +104,13 @@ internal sealed class ConsentDialog : IConsentPrompt
 /// <summary>Dialog where the human types a new secret. The agent never handles the value.</summary>
 internal sealed class SecretInputDialog : ISecretInput
 {
-    public byte[]? ReadSecret(string reference, string? label) => Sta.Run<byte[]?>(() =>
+    public byte[]? ReadSecret(string reference, string? label, string? reason = null) => Sta.Run<byte[]?>(() =>
     {
         Application.EnableVisualStyles();
-        using var form = ConsentDialog.NewForm("Shinkansen Vault — нова тайна / new secret", 520, 230);
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(10), RowCount = 4 };
+        using var form = ConsentDialog.NewForm("Shinkansen Vault — нова тайна / new secret", 560, reason == null ? 230 : 300);
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(10), RowCount = 5 };
+        if (reason != null)
+            layout.Controls.Add(new Label { AutoSize = true, MaximumSize = new Size(520, 0), Text = $"AI агентът иска тази тайна / An AI agent asks for this secret:\n{reason}" });
         layout.Controls.Add(new Label { AutoSize = true, Text = $"Референция / Reference: {reference}" });
         layout.Controls.Add(new Label { AutoSize = true, Text = $"Етикет / Label: {label ?? "-"}" });
         layout.Controls.Add(new Label { AutoSize = true, Text = "Стойност / Value:" });

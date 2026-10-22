@@ -84,14 +84,15 @@ public sealed class VaultService
 
     // ---------- add ----------
 
-    public async Task AddAsync(VaultRef reference, string? label, bool replace, ISecretInput input)
+    public async Task AddAsync(VaultRef reference, string? label, bool replace, ISecretInput input, string? reason = null)
     {
         var vault = VaultFile.Load(_vaultPath);
         var existing = vault.Find(reference);
         if (existing != null && !replace)
             throw new VaultException($"{reference} already exists. Use --replace to overwrite it.");
 
-        var value = input.ReadSecret(reference.ToString(), label ?? existing?.Label);
+        var shownReason = existing != null && reason != null ? "ЗАМЕНЯ съществуваща стойност / REPLACES existing value. " + reason : reason;
+        var value = input.ReadSecret(reference.ToString(), label ?? existing?.Label, shownReason);
         if (value == null)
         {
             _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, "add", new[] { reference.ToString() }, null, null, "denied", "input cancelled"));
@@ -133,7 +134,7 @@ public sealed class VaultService
 
     // ---------- run ----------
 
-    public async Task<int> RunAsync(IReadOnlyList<EnvBinding> bindings, string reason, IReadOnlyList<string> command, TextWriter stdout, TextWriter stderr)
+    public async Task<int> RunAsync(IReadOnlyList<EnvBinding> bindings, string reason, IReadOnlyList<string> command, TextWriter stdout, TextWriter stderr, bool closeStdin = false)
     {
         if (bindings.Count == 0) throw new VaultException("At least one --env NAME=vault://ref is required.", ExitCodes.Usage);
         RequireReason(reason);
@@ -147,12 +148,12 @@ public sealed class VaultService
 
         var values = await DecryptAsync(vault, refs, request);
         var env = bindings.ToDictionary(b => b.Name, b => values[b.Ref.Path]);
-        return await ProcessRunner.RunAsync(command, env, values.Values.ToList(), stdout, stderr);
+        return await ProcessRunner.RunAsync(command, env, values.Values.ToList(), stdout, stderr, closeStdin);
     }
 
     // ---------- render ----------
 
-    public async Task RenderAsync(string templatePath, string outputPath, string reason)
+    public async Task RenderAsync(string templatePath, string outputPath, string reason, TextWriter? info = null)
     {
         RequireReason(reason);
         if (!File.Exists(templatePath)) throw new VaultException($"Template not found: {templatePath}");
@@ -169,7 +170,7 @@ public sealed class VaultService
         var tmp = fullOutput + ".svault-tmp";
         await File.WriteAllTextAsync(tmp, rendered, new UTF8Encoding(false));
         File.Move(tmp, fullOutput, overwrite: true);
-        _info.WriteLine($"Rendered {refs.Count} reference(s) into {fullOutput}. Content not shown.");
+        (info ?? _info).WriteLine($"Rendered {refs.Count} reference(s) into {fullOutput}. Content not shown.");
     }
 
     // ---------- clip ----------
