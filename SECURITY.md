@@ -42,6 +42,7 @@ This is the key limitation. Claude Code (or any agent) runs under your Windows a
 
 ### Masking limits
 
+- The mask is `••••` when the output encoding supports it, otherwise `****` (e.g. a console on code page 437).
 - Only exact, literal matches are masked. Encoded forms (base64, URL-encoding, hex, reversed, split across output with other characters, partially printed) are **not** masked.
 - Output is processed as text in the console's encoding; binary output may not be masked.
 - Up to (longest secret length − 1) characters of output are held back until more output arrives or the process ends, so interactive prompts may appear late.
