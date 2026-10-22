@@ -44,7 +44,7 @@ Shinkansen Vault (`svault.exe`) е малък трезор за пароли з�
 git clone https://github.com/galinpd-lgtm/shinkansen-vault.git
 cd shinkansen-vault
 dotnet test
-dotnet publish src/svault/svault.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+dotnet publish src/svault/svault.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 .\publish\svault.exe help
 ```
 
@@ -108,7 +108,7 @@ Requires Windows 10 2004+ / Windows 11, the [.NET 8 SDK](https://dotnet.microsof
 git clone https://github.com/galinpd-lgtm/shinkansen-vault.git
 cd shinkansen-vault
 dotnet test
-dotnet publish src/svault/svault.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+dotnet publish src/svault/svault.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 .\publish\svault.exe help
 ```
 
