@@ -45,7 +45,7 @@ public static class ProcessRunner
 
     private static async Task PumpAsync(StreamReader reader, TextWriter writer, IReadOnlyCollection<string> secrets)
     {
-        var masker = new SecretMasker(secrets);
+        var masker = new SecretMasker(secrets, SecretMasker.MaskFor(writer.Encoding));
         var buffer = new char[4096];
         int n;
         while ((n = await reader.ReadAsync(buffer.AsMemory())) > 0)

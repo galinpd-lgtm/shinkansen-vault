@@ -44,7 +44,7 @@ Windows Hello, DPAPI, диалозите и клипбордът не могат
 - [ ] ```powershell
   & $sv run --env DEMO=vault://test/demo --reason "Manual test run" -- cmd /c "echo value=%DEMO%"
   ```
-  Очаквано: диалог със съгласие показва причината, `DEMO = vault://test/demo` и командата. „Разреши“ → PIN → изход `value=••••`.
+  Очаквано: диалог със съгласие показва причината, `DEMO = vault://test/demo` и командата. „Разреши“ → PIN → изход `value=••••` (или `value=****`, ако конзолата не е UTF-8).
 - [ ] Доказателство, че стойността е подадена (без да се вижда):
   ```powershell
   & $sv run --env DEMO=vault://test/demo --reason "Check length" -- powershell -NoProfile -Command "`$env:DEMO.Length"

@@ -21,7 +21,7 @@ Shinkansen Vault (`svault.exe`) е малък трезор за пароли з�
 | `svault init` | Създава трезора и регистрира ключ в Windows Hello. |
 | `svault add vault://проект/име [--label "текст"] [--replace]` | Отваря прозорец, в който **човекът** въвежда стойността. Никога като аргумент или през stdin. |
 | `svault list` | Само референции и етикети, никога стойности. |
-| `svault run --env ИМЕ=vault://реф [...] --reason "защо" -- команда ...` | След съгласие + Hello пуска командата с тайните в нейната среда. Всяка тайна в изхода се заменя с `••••`. |
+| `svault run --env ИМЕ=vault://реф [...] --reason "защо" -- команда ...` | След съгласие + Hello пуска командата с тайните в нейната среда. Всяка тайна в изхода се заменя с `••••` (или `****`, ако конзолата не поддържа този знак). |
 | `svault render шаблон изход --reason "защо"` | Заменя `{{vault://реф}}` в шаблона и записва резултата директно във файла. Показва само потвърждение. |
 | `svault clip vault://реф --reason "защо"` | Копира в клипборда за 20 s (за поставяне от човека), после го изчиства. |
 | `svault log [--tail N]` | Одитен дневник (JSONL): време, референции, команда/цел, причина, разрешено/отказано. Никога стойности. |
@@ -85,7 +85,7 @@ Shinkansen Vault (`svault.exe`) is a small Windows password vault unlocked with 
 | `svault init` | Creates the vault and registers a Windows Hello key. |
 | `svault add vault://project/name [--label "text"] [--replace]` | Opens a dialog where the **human** types the value. Never as an argument or via stdin. |
 | `svault list` | References and labels only, never values. |
-| `svault run --env NAME=vault://ref [...] --reason "why" -- command ...` | After consent + Hello, runs the command with the secrets in its environment. Any secret in its output is replaced with `••••`. |
+| `svault run --env NAME=vault://ref [...] --reason "why" -- command ...` | After consent + Hello, runs the command with the secrets in its environment. Any secret in its output is replaced with `••••` (or `****` if the console cannot show that character). |
 | `svault render template output --reason "why"` | Replaces `{{vault://ref}}` placeholders and writes the result straight to the output file. Prints only a confirmation. |
 | `svault clip vault://ref --reason "why"` | Copies to the clipboard for 20 s (for the human to paste), then clears it. |
 | `svault log [--tail N]` | Audit log (JSONL): time, refs, command/target, reason, approved/denied. Never values. |

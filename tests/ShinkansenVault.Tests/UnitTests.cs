@@ -135,3 +135,21 @@ public class CommandLineTests
     [InlineData("NAME")]
     public void RejectsBadEnv(string env) => Assert.Throws<VaultException>(() => CommandLine.ParseEnv(env));
 }
+
+public class MaskEncodingTests
+{
+    [Fact]
+    public void UnicodeOutputGetsBullets() =>
+        Assert.Equal(SecretMasker.Mask, SecretMasker.MaskFor(new System.Text.UTF8Encoding(false)));
+
+    [Fact]
+    public void AsciiOutputGetsStars() =>
+        Assert.Equal(SecretMasker.AsciiMask, SecretMasker.MaskFor(System.Text.Encoding.ASCII));
+
+    [Fact]
+    public void CustomMaskIsUsed()
+    {
+        var m = new SecretMasker(new[] { "FAKE-x" }, SecretMasker.AsciiMask);
+        Assert.Equal("a **** b", m.Push("a FAKE-x b") + m.Flush());
+    }
+}

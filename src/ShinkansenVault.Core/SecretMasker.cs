@@ -10,12 +10,16 @@ namespace ShinkansenVault;
 public sealed class SecretMasker
 {
     public const string Mask = "••••";
+    /// <summary>Used when the output encoding cannot represent "•" (e.g. console code page 437).</summary>
+    public const string AsciiMask = "****";
+    private readonly string _mask;
     private readonly string[] _secrets;
     private readonly int _holdBack;
     private readonly StringBuilder _buffer = new();
 
-    public SecretMasker(IEnumerable<string> secrets)
+    public SecretMasker(IEnumerable<string> secrets, string mask = Mask)
     {
+        _mask = mask;
         // Longest first so a secret that contains another is masked as a whole.
         _secrets = secrets.Where(s => !string.IsNullOrEmpty(s)).Distinct()
             .OrderByDescending(s => s.Length).ToArray();
@@ -44,7 +48,20 @@ public sealed class SecretMasker
 
     private void ApplyMasks()
     {
-        foreach (var s in _secrets) _buffer.Replace(s, Mask);
+        foreach (var s in _secrets) _buffer.Replace(s, _mask);
+    }
+
+    /// <summary>Picks "••••" if <paramref name="encoding"/> can carry it, otherwise "****".</summary>
+    public static string MaskFor(Encoding encoding)
+    {
+        try
+        {
+            return encoding.GetString(encoding.GetBytes(Mask)) == Mask ? Mask : AsciiMask;
+        }
+        catch (EncoderFallbackException)
+        {
+            return AsciiMask;
+        }
     }
 
     /// <summary>One-shot convenience.</summary>
