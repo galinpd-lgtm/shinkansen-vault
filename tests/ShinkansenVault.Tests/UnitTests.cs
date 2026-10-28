@@ -74,6 +74,47 @@ public class SecretMaskerTests
     }
 
     [Fact]
+    public void CompleteLineIsEmittedAtOnce()
+    {
+        // A long secret used to hold back the end of every line until the next write.
+        var m = new SecretMasker(new[] { "FAKE-a-very-long-secret-token-0123456789" });
+        Assert.Equal("{\"id\":1,\"ok\":true}\n", m.Push("{\"id\":1,\"ok\":true}\n"));
+        Assert.Equal("", m.Flush());
+    }
+
+    [Fact]
+    public void LineIsMaskedBeforeItIsEmitted()
+    {
+        var m = new SecretMasker(new[] { "FAKE-a-very-long-secret-token-0123456789" });
+        var sb = new StringBuilder();
+        foreach (var c in "x=FAKE-a-very-long-secret-token-0123456789\ny=") sb.Append(m.Push(new[] { c }));
+        Assert.Equal("x=••••\n", sb.ToString());
+        Assert.Equal("y=", m.Flush());
+    }
+
+    [Fact]
+    public void PartialLineStillHeldForSplitSecret()
+    {
+        var m = new SecretMasker(new[] { "FAKE-Secret-1" });
+        var sb = new StringBuilder();
+        sb.Append(m.Push("done\nkey=FAKE-Sec"));
+        Assert.Equal("done\n", sb.ToString());
+        sb.Append(m.Push("ret-1 end\n"));
+        Assert.Equal("done\nkey=•••• end\n", sb.ToString());
+    }
+
+    [Fact]
+    public void MultilineSecretIsMaskedAcrossLines()
+    {
+        var m = new SecretMasker(new[] { "FAKE-line-one\nFAKE-line-two" });
+        var sb = new StringBuilder();
+        sb.Append(m.Push("k=FAKE-line-one\n"));
+        sb.Append(m.Push("FAKE-line-two\n"));
+        sb.Append(m.Flush());
+        Assert.Equal("k=••••\n", sb.ToString());
+    }
+
+    [Fact]
     public void LongestSecretWins() =>
         Assert.Equal("[••••]", SecretMasker.MaskAll("[abcdef]", new[] { "abc", "abcdef" }));
 
