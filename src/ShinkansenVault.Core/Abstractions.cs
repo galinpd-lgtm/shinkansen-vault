@@ -21,6 +21,20 @@ public interface IKeyProtector
     byte[] Unprotect(byte[] data);
 }
 
+/// <summary>
+/// Keeps the vault unlocked for the rest of the Windows sign-in: after the first consent + Windows Hello the
+/// master key is kept (DPAPI CurrentUser on Windows) and used until the human signs out, restarts, shuts down
+/// or runs <c>svault lock</c>. Bound to the vault by a fingerprint, so another vault never gets this key.
+/// </summary>
+public interface IUnlockCache
+{
+    /// <summary>A copy of the master key, or null if the vault is locked (nothing kept, other sign-in or vault).</summary>
+    byte[]? TryGet(string vaultFingerprint);
+    void Store(string vaultFingerprint, byte[] masterKey);
+    /// <summary>Forgets the key. Returns true if one was kept.</summary>
+    bool Clear();
+}
+
 /// <summary>What the human sees in the consent dialog before Windows Hello is asked.</summary>
 public sealed record ConsentRequest(string Action, IReadOnlyList<string> Refs, string Target, string Reason);
 

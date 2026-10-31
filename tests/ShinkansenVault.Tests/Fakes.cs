@@ -69,6 +69,18 @@ public sealed class FakeClipboard : IClipboard
     public void ClearIfEquals(string text) { if (Content == text) Content = null; }
 }
 
+/// <summary>In-memory stand-in for the sign-in unlock (session.bin). SignOut() is a new Windows sign-in.</summary>
+public sealed class FakeUnlockCache : IUnlockCache
+{
+    private string? _fingerprint;
+    private byte[]? _key;
+    public byte[]? TryGet(string vaultFingerprint) =>
+        _key != null && _fingerprint == vaultFingerprint ? (byte[])_key.Clone() : null;
+    public void Store(string vaultFingerprint, byte[] masterKey) { _fingerprint = vaultFingerprint; _key = (byte[])masterKey.Clone(); }
+    public bool Clear() { var was = _key != null; _key = null; _fingerprint = null; return was; }
+    public void SignOut() => Clear();
+}
+
 /// <summary>A temp vault folder plus a service wired with fakes.</summary>
 public sealed class TestVault : IDisposable
 {
@@ -81,11 +93,14 @@ public sealed class TestVault : IDisposable
     public VaultService Service { get; }
     public string VaultPath => Path.Combine(Dir, "vault.svlt");
 
-    public TestVault()
+    public FakeUnlockCache? Unlock { get; }
+
+    public TestVault(bool unlockForSignIn = false)
     {
         Directory.CreateDirectory(Dir);
         Audit = new AuditLog(Path.Combine(Dir, "audit.jsonl"));
-        Service = new VaultService(VaultPath, Hello, Protector, Consent, Audit, Info);
+        Unlock = unlockForSignIn ? new FakeUnlockCache() : null;
+        Service = new VaultService(VaultPath, Hello, Protector, Consent, Audit, Info, Unlock);
     }
 
     public string AllFilesText() =>

@@ -7,7 +7,8 @@ namespace ShinkansenVault;
 /// Minimal MCP server over stdio (JSON-RPC 2.0, one message per line).
 /// Tools: vault_list, vault_add, vault_run, vault_render, vault_check, vault_rotate, vault_log.
 /// No tool returns a secret value. vault_add only opens the input dialog: the human types the value,
-/// the agent gets back the reference. Every use still shows the consent dialog and asks for Windows Hello.
+/// the agent gets back the reference. The first use after the human signs in to Windows shows the consent dialog
+/// and asks for Windows Hello; then the vault stays unlocked until sign-out, restart, shutdown or `svault lock`.
 /// </summary>
 public sealed class McpServer
 {
@@ -105,8 +106,10 @@ public sealed class McpServer
                 "vault_list, call vault_add: the human types it into a dialog and you get back only its vault:// reference. " +
                 "Secrets are referenced as vault://name and are never returned. Use vault_run to inject them into a " +
                 "command's environment (output is masked) or vault_render to write them into a file you must not read. " +
-                "Every use shows the human a consent dialog and asks for their Windows Hello PIN. Always give an honest, " +
-                "specific reason. If denied, stop and ask the human.",
+                "The first use after the human signs in to Windows shows a consent dialog and asks for their Windows Hello " +
+                "PIN; after that the vault stays unlocked until they sign out, restart or lock it, so do not ask them to " +
+                "approve again. Every use is still logged with your reason: always give an honest, specific one. " +
+                "If denied, stop and ask the human.",
         };
     }
 
@@ -250,7 +253,7 @@ public sealed class McpServer
         Tool("vault_add",
             "Ask the human to store a secret you need (password, token, API key). Opens a dialog on their screen " +
             "where they type the value; you get back only the vault:// reference. Use this instead of asking for " +
-            "secrets in chat. Then Windows Hello confirms.",
+            "secrets in chat. Windows Hello confirms if the vault is locked.",
             new JsonObject
             {
                 ["type"] = "object",
@@ -264,8 +267,9 @@ public sealed class McpServer
                 ["required"] = new JsonArray("ref", "reason"),
             }),
         Tool("vault_run",
-            "Run a command with secrets injected as environment variables. The human sees a consent dialog with the " +
-            "reason, references and exact command, then confirms with Windows Hello. Secret values in the output are " +
+            "Run a command with secrets injected as environment variables. If the vault is locked, the human sees a consent " +
+            "dialog with the reason, references and exact command and confirms with Windows Hello; once unlocked it runs " +
+            "without asking (still logged). Secret values in the output are " +
             "masked. Do not write the values anywhere you can read.",
             new JsonObject
             {
@@ -304,7 +308,7 @@ public sealed class McpServer
             }),
         Tool("vault_check",
             "Check all stored passwords locally for weak and reused ones. Returns references only, never values. " +
-            "Asks the human for consent + Windows Hello once.",
+            "Asks the human for consent + Windows Hello only if the vault is locked.",
             new JsonObject
             {
                 ["type"] = "object",
@@ -314,7 +318,7 @@ public sealed class McpServer
                 },
             }),
         Tool("vault_rotate",
-            "Help the human change a password on a website. After consent + Windows Hello the vault generates a strong " +
+            "Help the human change a password on a website. After consent + Windows Hello (only if locked) the vault generates a strong " +
             "password and puts it in the clipboard; the human pastes it on the site (a dialog can also copy the old " +
             "password) and confirms. Only then is the new value stored. You never see either value. Open the site's " +
             "change-password page for the human first.",
