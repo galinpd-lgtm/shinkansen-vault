@@ -67,7 +67,7 @@ public class McpServerTests
         using var _ = v;
         var tools = (await s.HandleLineAsync(Req(1, "tools/list")))!["result"]!["tools"]!.AsArray()
             .Select(t => t!["name"]!.GetValue<string>()).ToList();
-        Assert.Equal(new[] { "vault_list", "vault_add", "vault_run", "vault_render", "vault_log" }, tools);
+        Assert.Equal(new[] { "vault_list", "vault_add", "vault_run", "vault_render", "vault_check", "vault_rotate", "vault_log" }, tools);
     }
 
     [Fact]

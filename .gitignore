@@ -5,3 +5,7 @@ obj/
 TestResults/
 publish/
 *.svlt
+# Never commit password exports (Google Password Manager CSV and similar)
+*.csv
+*.tsv
+*passwords*

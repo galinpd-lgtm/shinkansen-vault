@@ -20,11 +20,12 @@ Short rules for Claude Code and other agents that work with Shinkansen Vault. Co
 6. **Clipboard is for the human.** `svault clip vault://ref --reason "..."` is for the human to paste into a browser or app. Do not read the clipboard.
 7. **Never ask for a secret in chat.** If you need one that `vault_list` / `svault list` doesn't have, call the MCP tool `vault_add` (ref, label, reason): a dialog opens and the human types the value; you get only the reference. Without MCP, ask the human to run `svault add vault://x/y --label "..."`. There is no way to pass a value as an argument or via stdin; don't try.
 8. **If denied (exit code 5), stop and ask.** Do not retry in a loop.
-9. `svault log` shows the audit trail; you may read it (it never contains values).
+9. **Google sync is human-only.** `svault import-google` / `export-google` handle a plain-text CSV with every password. Never open, read, copy, move or commit such a file; never run these commands yourself unless the human asks, and let the human pick the file in the dialog.
+10. `svault log` shows the audit trail; you may read it (it never contains values).
 
 ## MCP tools
 
-When the `shinkansen-vault` MCP server is connected you have `vault_list`, `vault_add`, `vault_run` (`env` map, `command` array — not a shell — and `reason`), `vault_render` and `vault_log`. A result starting with `DENIED:` means the human said no: stop and ask. The dialog may take a while; the human has to read it and enter a PIN.
+When the `shinkansen-vault` MCP server is connected you have `vault_list`, `vault_add`, `vault_run` (`env` map, `command` array — not a shell — and `reason`), `vault_render`, `vault_check` (weak/reused passwords, names only), `vault_rotate` (`ref`, `reason`: the human pastes a generated password on the website and confirms; open the site's change-password page for them first) and `vault_log`. A result starting with `DENIED:` means the human said no: stop and ask. The dialog may take a while; the human has to read it and enter a PIN.
 
 ## Exit codes
 
