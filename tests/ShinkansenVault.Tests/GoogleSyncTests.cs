@@ -187,14 +187,18 @@ public class GoogleSyncTests
         Assert.NotEqual("FAKE-old-pw", newPw);
         Assert.NotEqual(rejected, newPw);
 
-        // The vault now injects the new value.
-        var stdout = new StringWriter();
-        var cmd = OperatingSystem.IsWindows()
-            ? new[] { "cmd.exe", "/c", "if \"%PW%\"==\"" + newPw + "\" (echo match) else (echo nomatch)" }
-            : new[] { "sh", "-c", "if [ \"$PW\" = '" + newPw + "' ]; then echo match; else echo nomatch; fi" };
-        await v.Service.RunAsync(new[] { new EnvBinding("PW", r) }, "unit test", cmd, stdout, new StringWriter());
-        Assert.Contains("match", stdout.ToString());
-        Assert.DoesNotContain("nomatch", stdout.ToString());
+        // The vault now holds the new value (checked through an export, not a shell:
+        // generated passwords may contain characters that cmd.exe interprets).
+        var outFile = Path.Combine(Path.GetTempPath(), "svault-rotate-" + Guid.NewGuid().ToString("N") + ".csv");
+        try
+        {
+            await v.Service.ExportGoogleAsync(outFile, "unit test");
+            Assert.Equal(newPw, GoogleCsv.Parse(File.ReadAllText(outFile)).Single().Password);
+        }
+        finally
+        {
+            SecureFile.Wipe(outFile);
+        }
         Assert.DoesNotContain(newPw, v.AllFilesText());
     }
 }
