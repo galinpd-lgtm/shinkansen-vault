@@ -5,7 +5,7 @@ namespace ShinkansenVault;
 
 /// <summary>
 /// Minimal MCP server over stdio (JSON-RPC 2.0, one message per line).
-/// Tools: vault_list, vault_add, vault_run, vault_render, vault_log.
+/// Tools: vault_list, vault_add, vault_run, vault_render, vault_check, vault_rotate, vault_log.
 /// No tool returns a secret value. vault_add only opens the input dialog: the human types the value,
 /// the agent gets back the reference. Every use still shows the consent dialog and asks for Windows Hello.
 /// </summary>
@@ -19,13 +19,18 @@ public sealed class McpServer
     private readonly AuditLog _audit;
     private readonly ISecretInput _input;
     private readonly string _version;
+    private readonly IClipboard? _clipboard;
+    private readonly IRotationPrompt? _rotation;
 
-    public McpServer(VaultService service, AuditLog audit, ISecretInput input, string version)
+    public McpServer(VaultService service, AuditLog audit, ISecretInput input, string version,
+        IClipboard? clipboard = null, IRotationPrompt? rotation = null)
     {
         _service = service;
         _audit = audit;
         _input = input;
         _version = version;
+        _clipboard = clipboard;
+        _rotation = rotation;
     }
 
     /// <summary>Reads requests until the input closes. Requests are handled one at a time.</summary>
@@ -117,6 +122,8 @@ public sealed class McpServer
                 "vault_add" => await AddToolAsync(args),
                 "vault_run" => await RunToolAsync(args),
                 "vault_render" => await RenderToolAsync(args),
+                "vault_check" => Text(await CheckTextAsync(args)),
+                "vault_rotate" => await RotateToolAsync(args),
                 "vault_log" => Text(string.Join("\n", _audit.ReadLines(OptionalInt(args, "tail") ?? 20))),
                 _ => throw new ArgumentException($"Unknown tool: {name}"),
             };
@@ -178,6 +185,42 @@ public sealed class McpServer
         var info = new StringWriter();
         await _service.RenderAsync(template, output, reason, info);
         return Text(info.ToString().Trim() + "\nDo not read the output file.");
+    }
+
+    private async Task<string> CheckTextAsync(JsonObject args)
+    {
+        var reason = args["reason"]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(reason)) reason = "Проверка за слаби и повторени пароли / check for weak and reused passwords";
+        return FormatCheck(await _service.CheckAsync(reason));
+    }
+
+    public static string FormatCheck(CheckReport r)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"Checked {r.Total} entries. Weak: {r.Weak.Count}. Reused groups: {r.ReusedGroups.Count} ({r.ReusedGroups.Sum(g => g.Count)} entries).");
+        if (r.ReusedGroups.Count > 0)
+        {
+            sb.AppendLine().AppendLine("Reused (same password in each group):");
+            int i = 1;
+            foreach (var g in r.ReusedGroups) sb.AppendLine($"  group {i++} ({g.Count}): {string.Join(", ", g)}");
+        }
+        if (r.Weak.Count > 0)
+        {
+            sb.AppendLine().AppendLine("Weak:");
+            foreach (var (reference, why) in r.Weak) sb.AppendLine($"  {reference}  ({why})");
+        }
+        return sb.ToString().TrimEnd();
+    }
+
+    private async Task<JsonObject> RotateToolAsync(JsonObject args)
+    {
+        if (_clipboard == null || _rotation == null) throw new VaultException("Rotate is not available in this host.");
+        var reference = VaultRef.Parse(args["ref"]?.GetValue<string>() ?? throw new VaultException("'ref' is required.", ExitCodes.Usage));
+        var reason = args["reason"]?.GetValue<string>() ?? "";
+        var saved = await _service.RotateAsync(reference, reason, _clipboard, _rotation);
+        return Text(saved
+            ? $"The human changed the password on the website and {reference} now holds the new value. You never saw it."
+            : $"DENIED: the human did not confirm the change; {reference} keeps the old value.", isError: !saved);
     }
 
     private static string Truncate(string s) =>
@@ -258,6 +301,32 @@ public sealed class McpServer
                     ["reason"] = new JsonObject { ["type"] = "string", ["description"] = "Honest, specific reason shown to the human." },
                 },
                 ["required"] = new JsonArray("template", "output", "reason"),
+            }),
+        Tool("vault_check",
+            "Check all stored passwords locally for weak and reused ones. Returns references only, never values. " +
+            "Asks the human for consent + Windows Hello once.",
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["reason"] = new JsonObject { ["type"] = "string", ["description"] = "Optional reason shown to the human." },
+                },
+            }),
+        Tool("vault_rotate",
+            "Help the human change a password on a website. After consent + Windows Hello the vault generates a strong " +
+            "password and puts it in the clipboard; the human pastes it on the site (a dialog can also copy the old " +
+            "password) and confirms. Only then is the new value stored. You never see either value. Open the site's " +
+            "change-password page for the human first.",
+            new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["ref"] = new JsonObject { ["type"] = "string", ["description"] = "Reference to rotate, e.g. vault://google/github.com" },
+                    ["reason"] = new JsonObject { ["type"] = "string", ["description"] = "Honest, specific reason shown to the human." },
+                },
+                ["required"] = new JsonArray("ref", "reason"),
             }),
         Tool("vault_log",
             "Show the last audit log entries (time, refs, target, reason, approved/denied). Never contains values.",

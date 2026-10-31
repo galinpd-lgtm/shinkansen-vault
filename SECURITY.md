@@ -62,6 +62,14 @@ This is the key limitation. Claude Code (or any agent) runs under your Windows a
 - If Windows Hello is reset (PIN reset that removes keys, TPM cleared, Windows reinstalled) the Hello key is lost and **the vault cannot be opened**. There is no recovery key in this MVP. Keep your own backup of important secrets elsewhere.
 - No network code exists in the program. Verify by reading the source; build it yourself with `dotnet publish`.
 
+## Google Password Manager sync
+
+- `import-google` and `export-google` handle Google's CSV, which holds every password in plain text. The file is chosen by the human in a file dialog; the commands print counts and references only.
+- Wiping overwrites the file with random bytes and deletes it. On SSDs and in synced folders (OneDrive, Nextcloud, Syncthing, Dropbox) copies may survive, so use a local, non-synced folder and keep the file only for minutes.
+- URLs, usernames and notes are sealed with AES-GCM like the passwords (only the reference, e.g. `vault://google/github.com`, and the site name are plain text).
+- `rotate` generates a 20-character password with a CSPRNG, puts it in the clipboard (excluded from clipboard history and cloud clipboard) and stores it only after the human confirms; the clipboard is cleared when the dialog closes. The previous value is kept sealed in the entry for undo.
+- `.gitignore` blocks `*.csv`; never commit an export.
+
 ## MCP mode (`svault mcp`)
 
 - Same rules as the CLI: no tool returns a value; `vault_run` / `vault_render` / `vault_add` each show a dialog and ask for Windows Hello. Nothing is cached between calls.

@@ -16,7 +16,7 @@ public sealed record EnvBinding(string Name, VaultRef Ref);
 ///   WrappedMasterKey = DPAPI_CurrentUser( AES-GCM(KEK, masterKey) ).
 /// There is deliberately no method that returns a secret value to the caller.
 /// </summary>
-public sealed class VaultService
+public sealed partial class VaultService
 {
     private readonly string _vaultPath;
     private readonly IHelloKey _hello;

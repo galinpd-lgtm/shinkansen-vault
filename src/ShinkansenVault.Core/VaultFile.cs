@@ -31,6 +31,8 @@ public sealed class VaultFile
     public byte[] MasterKeyAad() => System.Text.Encoding.UTF8.GetBytes("svault-mk-v1:" + VaultId);
     public byte[] EntryAad(string refPath) => System.Text.Encoding.UTF8.GetBytes("svault-entry-v1:" + VaultId + ":" + refPath);
 
+    public byte[] MetaAad(string refPath) => EntryAad(refPath + "#meta");
+
     public VaultEntry? Find(VaultRef r) => Entries.FirstOrDefault(e => e.Ref == r.Path);
 
     public static VaultFile Load(string path)
@@ -61,4 +63,9 @@ public sealed class VaultEntry
     public DateTimeOffset Updated { get; set; }
     /// <summary>Base64 of nonce|ciphertext|tag.</summary>
     public string Data { get; set; } = "";
+    /// <summary>Optional sealed JSON with login details (url, username, name, note) for Google sync. AAD: entry + "#meta".</summary>
+    public string? Meta { get; set; }
+    /// <summary>The value before the last rotate/import change (same sealing as <see cref="Data"/>), kept for undo.</summary>
+    public string? Previous { get; set; }
+    public DateTimeOffset? PreviousReplaced { get; set; }
 }

@@ -25,9 +25,23 @@ Shinkansen Vault (`svault.exe`) е малък трезор за пароли з�
 | `svault render шаблон изход --reason "защо"` | Заменя `{{vault://реф}}` в шаблона и записва резултата директно във файла. Показва само потвърждение. |
 | `svault clip vault://реф --reason "защо"` | Копира в клипборда за 20 s (за поставяне от човека), после го изчиства. |
 | `svault mcp` | MCP сървър за AI агенти (виж по-долу). |
+| `svault import-google [файл.csv]` | Внася износа от Google Password Manager: нови записи `vault://google/<сайт>`, сменените пароли се обновяват (старата остава като „предишна“), липсващите не се пипат. Накрая предлага да изтрие файла. |
+| `svault export-google [файл.csv]` | Записва файл във формата на Google за внасяне в passwords.google.com и го изтрива, когато потвърдите. |
+| `svault check` | Локална проверка: слаби и повторени пароли. Показва само имена. |
+| `svault rotate vault://реф --reason "защо"` | Нова силна парола в клипборда → поставяте я на сайта → потвърждавате → записва се. Старата остава като „предишна“. |
 | `svault log [--tail N]` | Одитен дневник (JSONL): време, референции, команда/цел, причина, разрешено/отказано. Никога стойности. |
 
 Файлове: `%LOCALAPPDATA%\ShinkansenVault\vault.svlt` и `audit.jsonl` (папката може да се смени с променливата `SVAULT_HOME`).
+
+### Синхронизация с Google Password Manager
+
+Google няма програмен достъп до паролите, затова синхронизацията минава през неговия CSV файл:
+
+1. **Google → трезор:** passwords.google.com → Настройки → *Изнасяне на паролите* → `svault import-google` → изберете файла → съгласие + PIN → „Изтрий файла“.
+2. **Поправка:** `svault check` показва слабите и повторените; за всяка парола `svault rotate vault://google/<сайт>`. Когато смените паролата в Chrome, той предлага да я обнови и в Google — така двете копия остават еднакви.
+3. **Трезор → Google** (напр. пароли, създадени от трезора): `svault export-google` → Настройки → *Внасяне на пароли* → „Изтрий файла“.
+
+CSV файлът съдържа паролите в явен вид. Дръжте го в локална папка, която **не се синхронизира** (OneDrive, Nextcloud, Syncthing), и го изтривайте веднага.
 
 ### Как работи криптографията (накратко)
 
@@ -73,6 +87,8 @@ dotnet publish src/svault/svault.csproj -c Release -r win-x64 --self-contained t
 | `vault_add` | Агентът иска нова тайна: на екрана излиза прозорец, **вие** въвеждате стойността, агентът получава само `vault://...`. |
 | `vault_run` | Като `svault run`: съгласие + Windows Hello, тайните в средата на командата, изходът маскиран. |
 | `vault_render` | Като `svault render`: попълва шаблон във файл, връща само потвърждение. |
+| `vault_check` | Слаби и повторени пароли — само имена. |
+| `vault_rotate` | Смяна на парола на сайт: новата е в клипборда, вие я поставяте и потвърждавате. |
 | `vault_log` | Последните записи от одитния дневник. |
 
 Няма инструмент, който връща стойност. Всяко ползване пак иска вашето „Разреши“ и PIN.
@@ -119,9 +135,23 @@ Shinkansen Vault (`svault.exe`) is a small Windows password vault unlocked with 
 | `svault render template output --reason "why"` | Replaces `{{vault://ref}}` placeholders and writes the result straight to the output file. Prints only a confirmation. |
 | `svault clip vault://ref --reason "why"` | Copies to the clipboard for 20 s (for the human to paste), then clears it. |
 | `svault mcp` | MCP server for AI agents (see below). |
+| `svault import-google [file.csv]` | Imports a Google Password Manager export: new logins become `vault://google/<site>`, changed passwords are updated (old value kept as previous), missing ones are left alone. Offers to wipe the file afterwards. |
+| `svault export-google [file.csv]` | Writes a Google-format CSV for import at passwords.google.com and wipes it when you confirm. |
+| `svault check` | Local check for weak and reused passwords. Names only. |
+| `svault rotate vault://ref --reason "why"` | Strong new password in the clipboard → you paste it on the website → confirm → stored. Old value kept as previous. |
 | `svault log [--tail N]` | Audit log (JSONL): time, refs, command/target, reason, approved/denied. Never values. |
 
 Files: `%LOCALAPPDATA%\ShinkansenVault\vault.svlt` and `audit.jsonl` (override the folder with `SVAULT_HOME`).
+
+### Sync with Google Password Manager
+
+Google offers no API for saved passwords, so sync goes through its CSV file:
+
+1. **Google → vault:** passwords.google.com → Settings → *Export passwords* → `svault import-google` → pick the file → consent + PIN → "Wipe file".
+2. **Fix:** `svault check` lists weak and reused passwords; for each, `svault rotate vault://google/<site>`. When you change a password in Chrome it offers to update Google too, so both copies stay the same.
+3. **Vault → Google** (e.g. passwords created by the vault): `svault export-google` → Settings → *Import passwords* → "Wipe file".
+
+The CSV holds passwords in plain text. Keep it in a local folder that is **not synced** (OneDrive, Nextcloud, Syncthing) and wipe it right away.
 
 ### Crypto in short
 
@@ -167,6 +197,8 @@ Agent rules: [docs/AGENT_GUIDE.md](docs/AGENT_GUIDE.md). Manual test on a real P
 | `vault_add` | The agent asks for a new secret: a dialog opens on screen, **you** type the value, the agent gets only `vault://...`. |
 | `vault_run` | Like `svault run`: consent + Windows Hello, secrets in the command's environment, output masked. |
 | `vault_render` | Like `svault render`: fills a template into a file, returns only a confirmation. |
+| `vault_check` | Weak and reused passwords — names only. |
+| `vault_rotate` | Change a password on a website: the new one is in the clipboard, you paste and confirm. |
 | `vault_log` | Latest audit log entries. |
 
 No tool returns a value. Every use still needs your "Allow" and PIN.

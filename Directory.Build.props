@@ -6,7 +6,7 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <!-- Local builds only; release builds take the version from the git tag (see build.yml). -->
-    <Version>0.1.1</Version>
+    <Version>0.3.0</Version>
     <Product>Shinkansen Vault</Product>
   </PropertyGroup>
 </Project>

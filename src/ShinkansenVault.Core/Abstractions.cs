@@ -47,6 +47,15 @@ public interface IClipboard
     void ClearIfEquals(string text);
 }
 
+/// <summary>
+/// Shown while the human changes a password on a website (svault rotate). The new password is already
+/// in the clipboard. Returns true only if the human confirms the website accepted it.
+/// </summary>
+public interface IRotationPrompt
+{
+    bool ConfirmChanged(string reference, string? site, Action copyNew, Action copyOld);
+}
+
 public sealed class VaultException : Exception
 {
     public int ExitCode { get; }
