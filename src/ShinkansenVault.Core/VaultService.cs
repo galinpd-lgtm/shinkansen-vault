@@ -210,7 +210,9 @@ public sealed partial class VaultService
             throw new VaultException("Unknown reference(s): " + string.Join(", ", missing));
         }
 
-        var masterKey = await UnlockAsync(vault, request, askConsent: true);
+        // The "approved" entry is written only after decryption, so the target (e.g. the command line
+        // of `run`) can be masked: a value typed into the command must not reach the audit log in plain text.
+        var masterKey = await UnlockAsync(vault, request, askConsent: true, auditApproved: false);
         var result = new Dictionary<string, string>();
         try
         {
@@ -220,9 +222,13 @@ public sealed partial class VaultService
                 try { result[r.Path] = Encoding.UTF8.GetString(plain); }
                 finally { VaultCrypto.Zero(plain); }
             }
+            _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, request.Action, request.Refs,
+                SecretMasker.MaskText(request.Target, result.Values), request.Reason, "approved"));
         }
         catch (CryptographicException)
         {
+            _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, request.Action, request.Refs,
+                SecretMasker.MaskText(request.Target, result.Values), request.Reason, "failed", "entry authentication failed"));
             throw new VaultException("An entry failed authentication (vault file was modified?).");
         }
         finally
@@ -232,7 +238,7 @@ public sealed partial class VaultService
         return result;
     }
 
-    private async Task<byte[]> UnlockAsync(VaultFile vault, ConsentRequest request, bool askConsent)
+    private async Task<byte[]> UnlockAsync(VaultFile vault, ConsentRequest request, bool askConsent, bool auditApproved = true)
     {
         var refs = request.Refs;
         if (askConsent && !_consent.Confirm(request))
@@ -254,7 +260,8 @@ public sealed partial class VaultService
             kek = VaultCrypto.DeriveKek(signature, Convert.FromBase64String(vault.KdfSalt));
             inner = _protector.Unprotect(Convert.FromBase64String(vault.WrappedMasterKey));
             var masterKey = VaultCrypto.Open(kek, inner, vault.MasterKeyAad());
-            _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, request.Action, refs, request.Target, request.Reason, "approved"));
+            if (auditApproved)
+                _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, request.Action, refs, request.Target, request.Reason, "approved"));
             return masterKey;
         }
         catch (CryptographicException)

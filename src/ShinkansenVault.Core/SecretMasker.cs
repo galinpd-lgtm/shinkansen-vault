@@ -60,6 +60,14 @@ public sealed class SecretMasker
         return rest;
     }
 
+    /// <summary>Masks every secret in a whole, already complete text (e.g. a command line for the audit log).</summary>
+    public static string MaskText(string? text, IEnumerable<string> secrets, string mask = Mask)
+    {
+        if (string.IsNullOrEmpty(text)) return text ?? "";
+        var m = new SecretMasker(secrets, mask);
+        return m.Push(text) + m.Flush();
+    }
+
     private void ApplyMasks()
     {
         foreach (var s in _secrets) _buffer.Replace(s, _mask);
