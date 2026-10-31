@@ -1,6 +1,6 @@
 # Security / Сигурност
 
-> Кратко на български: Shinkansen Vault пази тайните шифровани и изисква Windows Hello за всяко използване. Но AI агентът работи като **същия Windows потребител**, затова „агентът не вижда тайните“ е гарантирано **по дизайн** (няма команда за показване, изходът се маскира, файловете отиват там, където агентът е инструктиран да не чете), **а не криптографски**. Човекът трябва да чете диалога за съгласие преди да въведе PIN.
+> Кратко на български: Shinkansen Vault пази тайните шифровани и изисква Windows Hello веднъж след влизане в Windows; после трезорът е отключен до излизане, рестарт, изключване или `svault lock`. Но AI агентът работи като **същия Windows потребител**, затова „агентът не вижда тайните“ е гарантирано **по дизайн** (няма команда за показване, изходът се маскира, файловете отиват там, където агентът е инструктиран да не чете), **а не криптографски**. Човекът трябва да чете диалога за съгласие преди да въведе PIN.
 
 ## Reporting a vulnerability
 
@@ -12,7 +12,7 @@ Please open a private security advisory on GitHub (Security → Report a vulnera
 |---|---|
 | Secret values at rest (`vault.svlt`) | AES-256-GCM per entry, random 256-bit master key, AAD binds each entry to the vault id and its reference (entries cannot be swapped). |
 | Master key | Wrapped with AES-256-GCM under KEK = HKDF-SHA256(Hello signature over a per-vault challenge, per-vault salt), then wrapped again with DPAPI CurrentUser. |
-| Each use of a value | Consent dialog (action, reason, references, exact command or target file), then a Windows Hello prompt. Nothing is cached: every `run`, `render`, `clip` and `add` asks again. |
+| Each use of a value | If the vault is locked: consent dialog (action, reason, references, exact command or target file), then a Windows Hello prompt. The master key is then kept for the rest of the Windows sign-in (see *Unlocked for the sign-in*), and later uses run without a prompt. `export-google` shows the consent dialog every time. |
 | Audit trail | `audit.jsonl`: time, action, references, target, reason, approved/denied/failed. Never values: a value typed into the target (e.g. the command of `run`) is masked as `••••` once the entries are decrypted. A denied or cancelled request never decrypts, so its target is recorded as shown in the dialog. |
 
 ### Key derivation detail
@@ -38,6 +38,7 @@ This is the key limitation. Claude Code (or any agent) runs under your Windows a
   - rendered files go to paths the agent is told not to read (see `docs/AGENT_GUIDE.md`).
 - **The human is the real control.** The consent dialog shows the exact command or output path. A malicious or confused agent can request things like `cmd /c echo %PASS% > out.txt` or `render` into a file it then reads. If you approve that, the agent can see the value. **Read the dialog before entering your PIN.**
 - A process running as you could, in principle, read the memory of `svault.exe` or of the child process while a value is in use, inject keystrokes into the consent dialog, or read the clipboard during the 20 s window. Windows Hello itself still requires your PIN/biometric, which the agent cannot supply.
+- **Unlocked for the sign-in.** After the first approved use the master key is kept in `session.bin` next to the vault, sealed with DPAPI CurrentUser and bound to the Windows logon session (token AuthenticationId), the boot time and the vault's fingerprint. Signing out, restarting, shutting down (also with Fast Startup, which signs you out), re-creating the vault or `svault lock` ends it; a mismatch wipes the file. **While unlocked, any program running as you — including an agent or malware — can use the vault without a prompt**: the consent dialog no longer stands between a bad command and your secrets. Every use is still in the audit log with its command and reason (`svault log`). Use `svault lock` before leaving the PC unattended or running untrusted code.
 - DPAPI CurrentUser alone would not stop a same-user process; that is why the Hello layer exists. DPAPI adds: the vault file is useless on another machine or Windows account.
 
 ### Masking limits
@@ -72,7 +73,7 @@ This is the key limitation. Claude Code (or any agent) runs under your Windows a
 
 ## MCP mode (`svault mcp`)
 
-- Same rules as the CLI: no tool returns a value; `vault_run` / `vault_render` / `vault_add` each show a dialog and ask for Windows Hello. Nothing is cached between calls.
+- Same rules as the CLI: no tool returns a value; while the vault is locked, `vault_run` / `vault_render` / `vault_add` show a dialog and ask for Windows Hello. Once unlocked for the sign-in, every agent session uses it without prompts until sign-out, restart, shutdown or `svault lock`.
 - Still no network: MCP runs over stdin/stdout of a local process started by the Claude app.
 - The child of `vault_run` gets a closed stdin, so it cannot read or inject into the MCP channel.
 - `vault_add` lets an agent *ask* for a secret. A malicious or confused agent could ask for something it should not have (for example your bank password). Read the reason in the dialog; cancel if it does not make sense. Replacing an existing value needs `replace` and the dialog says so.

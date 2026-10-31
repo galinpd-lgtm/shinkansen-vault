@@ -44,15 +44,23 @@ Windows Hello, DPAPI, диалозите и клипбордът не могат
 - [ ] ```powershell
   & $sv run --env DEMO=vault://test/demo --reason "Manual test run" -- cmd /c "echo value=%DEMO%"
   ```
-  Очаквано: диалог със съгласие показва причината, `DEMO = vault://test/demo` и командата. „Разреши“ → PIN → изход `value=••••` (или `value=****`, ако конзолата не е UTF-8).
+  Очаквано: изход `value=••••` (или `value=****`, ако конзолата не е UTF-8). Без диалог и без PIN: `add` в т. 3 вече отключи трезора за това влизане в Windows. Ако все пак се появи диалог (напр. след рестарт) — „Разреши“ → PIN.
 - [ ] Доказателство, че стойността е подадена (без да се вижда):
   ```powershell
   & $sv run --env DEMO=vault://test/demo --reason "Check length" -- powershell -NoProfile -Command "`$env:DEMO.Length"
   ```
   Очаквано: `13`.
-- [ ] Повторете първата команда и натиснете **„Откажи“** → `svault: Denied by the user.`, `$LASTEXITCODE` = 5, Hello **не** се появява.
-- [ ] Повторете и натиснете „Разреши“, но **откажете** в Windows Hello → `Windows Hello was cancelled.`, код 5.
+- [ ] `& $sv lock` → `Locked.`; после повторете първата команда и натиснете **„Откажи“** → `svault: Denied by the user.`, `$LASTEXITCODE` = 5, Hello **не** се появява.
+- [ ] Повторете и натиснете „Разреши“, но **откажете** в Windows Hello → `Windows Hello was cancelled.`, код 5. `& $sv status` → `locked`.
 - [ ] Esc в диалога = отказ? Enter не разрешава случайно?
+
+## 4а. Отключен за влизането / Unlocked for the sign-in
+
+- [ ] Пуснете първата команда от т. 4 → „Разреши“ → PIN. После я пуснете още 3 пъти → **нито диалог, нито PIN**. `& $sv status` → `unlocked for this sign-in`.
+- [ ] Отворете **нов** PowerShell (или нова сесия на агента с `svault mcp`) и пуснете командата → пак без питане.
+- [ ] `& $sv export-google "$env:TEMP\svault-out\x.csv"` (ако има записи от Google) → диалогът се появява **винаги**, без PIN.
+- [ ] Излезте от Windows (Sign out) и влезте пак → първата команда **пита** отново. Същото след рестарт и след изключване.
+- [ ] `& $sv lock` → следващата команда пита отново. В `& $sv log` има ред `"lock"`.
 
 ## 5. render
 
@@ -60,13 +68,13 @@ Windows Hello, DPAPI, диалозите и клипбордът не могат
   "user=demo`npass={{vault://test/demo}}" | Set-Content "$env:TEMP\t.template"
   & $sv render "$env:TEMP\t.template" "$env:TEMP\svault-out\t.conf" --reason "Manual render"
   ```
-  Очаквано: диалог → PIN → само `Rendered 1 reference(s) into ... Content not shown.`
+  Очаквано: само `Rendered 1 reference(s) into ... Content not shown.` (диалог → PIN само ако трезорът е заключен).
 - [ ] Отворете `%TEMP%\svault-out\t.conf` в Notepad (**като човек**) → `pass=FAKE-test-123`.
 - [ ] `& $sv render "$env:TEMP\t.template" CON --reason x` → отказ („not a device“).
 
 ## 6. clip
 
-- [ ] `& $sv clip vault://test/demo --reason "Paste test"` → диалог → PIN → „Copied ... cleared in 20 s“.
+- [ ] `& $sv clip vault://test/demo --reason "Paste test"` → „Copied ... cleared in 20 s“ (диалог → PIN само ако е заключен).
 - [ ] Поставете (Ctrl+V) в Notepad до 20 s → `FAKE-test-123`.
 - [ ] След 20 s поставете отново → нищо.
 - [ ] Win+V (история на клипборда, ако е включена) → стойността **не** е там.
@@ -82,6 +90,7 @@ Windows Hello, DPAPI, диалозите и клипбордът не могат
 ## 9. Почистване / Cleanup
 
 ```powershell
+& $sv lock
 Remove-Item -Recurse -Force "$env:TEMP\svault-test", "$env:TEMP\svault-out", "$env:TEMP\t.template"
 Remove-Item Env:\SVAULT_HOME
 ```
@@ -92,4 +101,4 @@ Remove-Item Env:\SVAULT_HOME
 За всяка точка: ✅ / ❌ + текста на грешката. Особено важно:
 1. Дали `init` успя (т.е. подписите на Hello са детерминистични на вашия TPM).
 2. Дали Hello прозорецът се появява отпред или зад конзолата.
-3. Колко пъти Hello пита при `init` и при всяко използване.
+3. Колко пъти Hello пита при `init`, при първото използване след влизане и дали след това наистина не пита (т. 4а).

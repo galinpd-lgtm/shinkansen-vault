@@ -24,8 +24,16 @@ public sealed partial class VaultService
     private readonly IConsentPrompt _consent;
     private readonly AuditLog _audit;
     private readonly TextWriter _info;
+    private readonly IUnlockCache? _unlockCache;
 
-    public VaultService(string vaultPath, IHelloKey hello, IKeyProtector protector, IConsentPrompt consent, AuditLog audit, TextWriter info)
+    /// <summary>
+    /// Actions that show the consent dialog even while the vault is unlocked for the sign-in:
+    /// export-google writes every password in plain text to a file.
+    /// </summary>
+    private static readonly HashSet<string> AlwaysAsk = new(StringComparer.Ordinal) { "export-google" };
+
+    public VaultService(string vaultPath, IHelloKey hello, IKeyProtector protector, IConsentPrompt consent, AuditLog audit, TextWriter info,
+        IUnlockCache? unlockCache = null)
     {
         _vaultPath = vaultPath;
         _hello = hello;
@@ -33,7 +41,32 @@ public sealed partial class VaultService
         _consent = consent;
         _audit = audit;
         _info = info;
+        _unlockCache = unlockCache;
     }
+
+    // ---------- lock / status ----------
+
+    /// <summary>True if the vault is unlocked for this sign-in (no dialog, no Windows Hello until sign-out or lock).</summary>
+    public bool IsUnlocked()
+    {
+        if (_unlockCache == null || !File.Exists(_vaultPath)) return false;
+        var key = _unlockCache.TryGet(Fingerprint(VaultFile.Load(_vaultPath)));
+        VaultCrypto.Zero(key);
+        return key != null;
+    }
+
+    /// <summary>Locks the vault now: the next use asks for consent and Windows Hello again.</summary>
+    public bool Lock()
+    {
+        var was = _unlockCache?.Clear() ?? false;
+        _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, "lock", Array.Empty<string>(), null, null, "approved",
+            was ? "vault locked" : "vault was not unlocked"));
+        return was;
+    }
+
+    /// <summary>Ties a kept key to this exact vault: a re-created vault (new id or wrapped key) is a different one.</summary>
+    private static string Fingerprint(VaultFile vault) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(vault.VaultId + "\n" + vault.WrappedMasterKey)));
 
     // ---------- init ----------
 
@@ -212,7 +245,7 @@ public sealed partial class VaultService
 
         // The "approved" entry is written only after decryption, so the target (e.g. the command line
         // of `run`) can be masked: a value typed into the command must not reach the audit log in plain text.
-        var masterKey = await UnlockAsync(vault, request, askConsent: true, auditApproved: false);
+        var (masterKey, kept) = await UnlockCoreAsync(vault, request, askConsent: true, auditApproved: false);
         var result = new Dictionary<string, string>();
         try
         {
@@ -223,10 +256,11 @@ public sealed partial class VaultService
                 finally { VaultCrypto.Zero(plain); }
             }
             _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, request.Action, request.Refs,
-                SecretMasker.MaskText(request.Target, result.Values), request.Reason, "approved"));
+                SecretMasker.MaskText(request.Target, result.Values), request.Reason, "approved", kept ? UnlockedDetail : null));
         }
         catch (CryptographicException)
         {
+            if (kept) _unlockCache?.Clear();   // a kept key that no longer opens the entries is useless
             _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, request.Action, request.Refs,
                 SecretMasker.MaskText(request.Target, result.Values), request.Reason, "failed", "entry authentication failed"));
             throw new VaultException("An entry failed authentication (vault file was modified?).");
@@ -238,9 +272,31 @@ public sealed partial class VaultService
         return result;
     }
 
-    private async Task<byte[]> UnlockAsync(VaultFile vault, ConsentRequest request, bool askConsent, bool auditApproved = true)
+    private const string UnlockedDetail = "unlocked for this sign-in";
+
+    private async Task<byte[]> UnlockAsync(VaultFile vault, ConsentRequest request, bool askConsent, bool auditApproved = true) =>
+        (await UnlockCoreAsync(vault, request, askConsent, auditApproved)).Key;
+
+    /// <summary>→ (master key, whether it was the key kept for this sign-in). The caller zeroes the key.</summary>
+    private async Task<(byte[] Key, bool Kept)> UnlockCoreAsync(VaultFile vault, ConsentRequest request, bool askConsent, bool auditApproved)
     {
         var refs = request.Refs;
+        var fingerprint = Fingerprint(vault);
+        var kept = _unlockCache?.TryGet(fingerprint);
+        if (kept != null)
+        {
+            // Unlocked earlier in this sign-in: no dialog and no Windows Hello, except for AlwaysAsk actions.
+            if (askConsent && AlwaysAsk.Contains(request.Action) && !_consent.Confirm(request))
+            {
+                VaultCrypto.Zero(kept);
+                _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, request.Action, refs, request.Target, request.Reason, "denied", "consent dialog"));
+                throw new VaultException("Denied by the user.", ExitCodes.Denied);
+            }
+            if (auditApproved)
+                _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, request.Action, refs, request.Target, request.Reason, "approved", UnlockedDetail));
+            return (kept, true);
+        }
+
         if (askConsent && !_consent.Confirm(request))
         {
             _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, request.Action, refs, request.Target, request.Reason, "denied", "consent dialog"));
@@ -260,9 +316,10 @@ public sealed partial class VaultService
             kek = VaultCrypto.DeriveKek(signature, Convert.FromBase64String(vault.KdfSalt));
             inner = _protector.Unprotect(Convert.FromBase64String(vault.WrappedMasterKey));
             var masterKey = VaultCrypto.Open(kek, inner, vault.MasterKeyAad());
+            _unlockCache?.Store(fingerprint, masterKey);
             if (auditApproved)
                 _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, request.Action, refs, request.Target, request.Reason, "approved"));
-            return masterKey;
+            return (masterKey, false);
         }
         catch (CryptographicException)
         {

@@ -25,7 +25,7 @@ Short rules for Claude Code and other agents that work with Shinkansen Vault. Co
 
 ## MCP tools
 
-When the `shinkansen-vault` MCP server is connected you have `vault_list`, `vault_add`, `vault_run` (`env` map, `command` array — not a shell — and `reason`), `vault_render`, `vault_check` (weak/reused passwords, names only), `vault_rotate` (`ref`, `reason`: the human pastes a generated password on the website and confirms; open the site's change-password page for them first) and `vault_log`. A result starting with `DENIED:` means the human said no: stop and ask. The dialog may take a while; the human has to read it and enter a PIN.
+When the `shinkansen-vault` MCP server is connected you have `vault_list`, `vault_add`, `vault_run` (`env` map, `command` array — not a shell — and `reason`), `vault_render`, `vault_check` (weak/reused passwords, names only), `vault_rotate` (`ref`, `reason`: the human pastes a generated password on the website and confirms; open the site's change-password page for them first) and `vault_log`. A result starting with `DENIED:` means the human said no: stop and ask. If the vault is locked, the dialog may take a while: the human has to read it and enter a PIN. Once they approve, the vault stays unlocked until they sign out, restart or run `svault lock` — do not ask them to approve again, and do not lock it yourself. Every use is still logged with your reason.
 
 ## Exit codes
 

@@ -20,9 +20,13 @@ internal static class Program
           svault check                                               (weak / reused passwords, names only)
           svault rotate <vault://ref> --reason "text"                (new password via clipboard, saved on confirm)
           svault log [--tail N]
+          svault status                                              (locked or unlocked for this sign-in)
+          svault lock                                                (lock now; the next use asks again)
           svault mcp                                                 (MCP server over stdio for AI agents)
           svault version
 
+        The first use after you sign in to Windows asks for consent + Windows Hello; then the vault stays
+        unlocked until you sign out, restart, shut down or run 'svault lock'. export-google always asks.
         Vault folder: %LOCALAPPDATA%\ShinkansenVault (override with SVAULT_HOME).
         """;
 
@@ -53,7 +57,7 @@ internal static class Program
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ShinkansenVault");
         var audit = new AuditLog(Path.Combine(home, "audit.jsonl"));
         var service = new VaultService(Path.Combine(home, "vault.svlt"),
-            new WindowsHelloKey(), new DpapiProtector(), new ConsentDialog(), audit, Console.Error);
+            new WindowsHelloKey(), new DpapiProtector(), new ConsentDialog(), audit, Console.Error, new SessionUnlockCache(home));
 
         switch (parsed.Command)
         {
@@ -139,6 +143,18 @@ internal static class Program
             case "log":
                 Expect(parsed, 0);
                 foreach (var line in audit.ReadLines(parsed.Tail)) Console.WriteLine(line);
+                return 0;
+
+            case "status":
+                Expect(parsed, 0);
+                Console.WriteLine(service.IsUnlocked()
+                    ? "unlocked for this sign-in (until sign-out, restart, shutdown or 'svault lock')"
+                    : "locked (the next use asks for consent + Windows Hello)");
+                return 0;
+
+            case "lock":
+                Expect(parsed, 0);
+                Console.WriteLine(service.Lock() ? "Locked." : "Already locked.");
                 return 0;
 
             case "mcp":

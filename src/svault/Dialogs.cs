@@ -44,8 +44,10 @@ internal sealed class ConsentDialog : IConsentPrompt
             .AppendLine("Къде / Target:")
             .AppendLine("    " + r.Target)
             .AppendLine()
-            .AppendLine("Проверете командата/целта. При „Разреши“ Windows Hello ще поиска PIN.")
-            .AppendLine("Check the command/target. \"Allow\" will ask for your Windows Hello PIN.");
+            .AppendLine("Проверете командата/целта. При „Разреши“ Windows Hello ще поиска PIN, ако трезорът е заключен.")
+            .AppendLine("След това трезорът остава отключен до излизане, рестарт или изключване (svault lock заключва веднага).")
+            .AppendLine("Check the command/target. \"Allow\" asks for your Windows Hello PIN if the vault is locked;")
+            .AppendLine("it then stays unlocked until you sign out, restart or shut down ('svault lock' locks at once).");
 
         var box = new TextBox
         {
