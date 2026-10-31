@@ -86,6 +86,25 @@ public class VaultServiceTests
     }
 
     [Fact]
+    public async Task RunMasksValueTypedIntoCommandInAuditLog()
+    {
+        using var v = await NewVaultWithSecretAsync();
+        // Someone typed the value itself into the command, next to the reference.
+        IReadOnlyList<string> cmd = OperatingSystem.IsWindows()
+            ? new[] { "cmd.exe", "/c", "echo ok & rem " + Secret }
+            : new[] { "sh", "-c", "echo ok # " + Secret };
+        var code = await v.Service.RunAsync(
+            new[] { new EnvBinding("X", VaultRef.Parse("vault://demo/db")) }, "unit test", cmd, TextWriter.Null, TextWriter.Null);
+
+        Assert.Equal(0, code);
+        var last = v.Audit.ReadLines().Last();
+        Assert.Contains("\"approved\"", last);
+        Assert.Contains("echo ok", last);
+        Assert.DoesNotContain(Secret, v.AllFilesText());
+        Assert.Single(v.Audit.ReadLines(), l => l.Contains("\"run\""));   // one entry per run, not two
+    }
+
+    [Fact]
     public async Task CancelledHelloDenies()
     {
         using var v = await NewVaultWithSecretAsync();

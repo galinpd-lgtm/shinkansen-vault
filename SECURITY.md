@@ -13,7 +13,7 @@ Please open a private security advisory on GitHub (Security → Report a vulnera
 | Secret values at rest (`vault.svlt`) | AES-256-GCM per entry, random 256-bit master key, AAD binds each entry to the vault id and its reference (entries cannot be swapped). |
 | Master key | Wrapped with AES-256-GCM under KEK = HKDF-SHA256(Hello signature over a per-vault challenge, per-vault salt), then wrapped again with DPAPI CurrentUser. |
 | Each use of a value | Consent dialog (action, reason, references, exact command or target file), then a Windows Hello prompt. Nothing is cached: every `run`, `render`, `clip` and `add` asks again. |
-| Audit trail | `audit.jsonl`: time, action, references, target, reason, approved/denied/failed. Never values. |
+| Audit trail | `audit.jsonl`: time, action, references, target, reason, approved/denied/failed. Never values: a value typed into the target (e.g. the command of `run`) is masked as `••••` once the entries are decrypted. A denied or cancelled request never decrypts, so its target is recorded as shown in the dialog. |
 
 ### Key derivation detail
 
