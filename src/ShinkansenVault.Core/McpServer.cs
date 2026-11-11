@@ -220,10 +220,19 @@ public sealed class McpServer
         if (_clipboard == null || _rotation == null) throw new VaultException("Rotate is not available in this host.");
         var reference = VaultRef.Parse(args["ref"]?.GetValue<string>() ?? throw new VaultException("'ref' is required.", ExitCodes.Usage));
         var reason = args["reason"]?.GetValue<string>() ?? "";
-        var saved = await _service.RotateAsync(reference, reason, _clipboard, _rotation);
-        return Text(saved
-            ? $"The human changed the password on the website and {reference} now holds the new value. You never saw it."
-            : $"DENIED: the human did not confirm the change; {reference} keeps the old value.", isError: !saved);
+        var target = args["target"]?.GetValue<string>() ?? "website";
+        if (target != "website" && target != "service")
+            throw new VaultException("'target' must be \"website\" or \"service\".", ExitCodes.Usage);
+        var forService = target == "service";
+        var saved = await _service.RotateAsync(reference, reason, _clipboard, _rotation, forService: forService);
+        if (!saved)
+            return Text($"DENIED: the human did not confirm; {reference} keeps the old value.", isError: true);
+        return Text(forService
+            ? $"{reference} now holds a new random value (the old one is kept as previous). Apply it now with vault_run " +
+              "(e.g. ALTER USER ... with the value from an environment variable) and test it. You never saw it."
+            : $"The human changed the password on the website and {reference} now holds the new value. You never saw it. " +
+              "Ask the human to log out and log in again with the vault's password to confirm it works " +
+              "(if the browser's own suggested password was saved instead, the test fails: then use vault_add with replace).");
     }
 
     private static string Truncate(string s) =>
@@ -329,6 +338,13 @@ public sealed class McpServer
                 {
                     ["ref"] = new JsonObject { ["type"] = "string", ["description"] = "Reference to rotate, e.g. vault://google/github.com" },
                     ["reason"] = new JsonObject { ["type"] = "string", ["description"] = "Honest, specific reason shown to the human." },
+                    ["target"] = new JsonObject
+                    {
+                        ["type"] = "string",
+                        ["enum"] = new JsonArray("website", "service"),
+                        ["description"] = "\"website\" (default): the human pastes the new password on a site. \"service\": a password " +
+                            "you apply yourself with vault_run (database user, API account); the human only confirms storing it.",
+                    },
                 },
                 ["required"] = new JsonArray("ref", "reason"),
             }),

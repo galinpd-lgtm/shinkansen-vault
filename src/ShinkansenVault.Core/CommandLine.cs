@@ -11,6 +11,8 @@ public sealed class ParsedArgs
     public string? Reason { get; set; }
     public string? Label { get; set; }
     public bool Replace { get; set; }
+    /// <summary><c>rotate --service</c>: the password belongs to a service a script updates, not to a website.</summary>
+    public bool Service { get; set; }
     public int? Tail { get; set; }
     /// <summary>Everything after "--" (for <c>run</c>).</summary>
     public List<string> Rest { get; } = new();
@@ -44,6 +46,9 @@ public static partial class CommandLine
                     break;
                 case "--label":
                     result.Label = Next();
+                    break;
+                case "--service":
+                    result.Service = true;
                     break;
                 case "--replace":
                     result.Replace = true;
