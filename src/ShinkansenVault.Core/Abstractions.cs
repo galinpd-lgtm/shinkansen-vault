@@ -68,6 +68,12 @@ public interface IClipboard
 public interface IRotationPrompt
 {
     bool ConfirmChanged(string reference, string? site, Action copyNew, Action copyOld);
+
+    /// <summary>
+    /// Rotation of a service password (database user, API account): nothing is pasted anywhere, a script
+    /// applies the new value afterwards. Returns true only if the human chooses to store the new value.
+    /// </summary>
+    bool ConfirmServiceSave(string reference, string reason);
 }
 
 public sealed class VaultException : Exception

@@ -18,7 +18,8 @@ internal static class Program
           svault import-google [file.csv]                            (Google Password Manager export → vault)
           svault export-google [file.csv]                            (vault → CSV for Google import; wiped after)
           svault check                                               (weak / reused passwords, names only)
-          svault rotate <vault://ref> --reason "text"                (new password via clipboard, saved on confirm)
+          svault rotate <vault://ref> --reason "text" [--service]    (new password via clipboard, saved on confirm;
+                                                                     --service: no clipboard, a script applies it)
           svault log [--tail N]
           svault status                                              (locked or unlocked for this sign-in)
           svault lock                                                (lock now; the next use asks again)
@@ -138,7 +139,7 @@ internal static class Program
             case "rotate":
                 Expect(parsed, 1);
                 return await service.RotateAsync(VaultRef.Parse(parsed.Positional[0], requireScheme: false), parsed.Reason ?? "",
-                    new WinClipboard(), new RotationDialog()) ? 0 : ExitCodes.Denied;
+                    new WinClipboard(), new RotationDialog(), forService: parsed.Service) ? 0 : ExitCodes.Denied;
 
             case "log":
                 Expect(parsed, 0);

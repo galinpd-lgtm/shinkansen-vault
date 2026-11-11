@@ -27,6 +27,41 @@ public class GoogleSyncTests
             copyNew();
             return Answer;
         }
+
+        public int ServiceCalls { get; private set; }
+        public string? ServiceReason { get; private set; }
+        public bool ConfirmServiceSave(string reference, string reason)
+        {
+            ServiceCalls++;
+            ServiceReason = reason;
+            return Answer;
+        }
+    }
+
+    [Fact]
+    public async Task RotateForServiceSkipsClipboardAndKeepsPrevious()
+    {
+        using var v = await NewVaultAsync();
+        await v.Service.AddAsync(VaultRef.Parse("vault://demo/db-user"), null, false, new FakeInput("FAKE-db-old"));
+        var r = VaultRef.Parse("vault://demo/db-user");
+        var clip = new FakeClipboard();
+        string Data() => VaultFile.Load(v.VaultPath).Find(r)!.Data;
+        var before = Data();
+
+        var no = new FakeRotation { Answer = false };
+        Assert.False(await v.Service.RotateAsync(r, "unit test: rotate db user", clip, no, forService: true));
+        Assert.Equal(1, no.ServiceCalls);
+        Assert.Equal(before, Data());
+
+        var yes = new FakeRotation { Answer = true };
+        Assert.True(await v.Service.RotateAsync(r, "unit test: rotate db user", clip, yes, forService: true));
+        Assert.Equal("unit test: rotate db user", yes.ServiceReason);
+        Assert.Null(yes.Site);            // the website dialog was never shown
+        Assert.Empty(clip.History);       // nothing ever went to the clipboard
+        var entry = VaultFile.Load(v.VaultPath).Find(r)!;
+        Assert.NotEqual(before, entry.Data);
+        Assert.Equal(before, entry.Previous);
+        Assert.Contains(v.Audit.ReadLines(), l => l.Contains("\"action\":\"rotate\"") && l.Contains("\"target\":\"service\""));
     }
 
     [Fact]

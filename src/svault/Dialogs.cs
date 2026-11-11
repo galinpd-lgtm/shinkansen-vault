@@ -212,7 +212,7 @@ internal static class Pickers
     }
 }
 
-/// <summary>Guides the human through changing one password on a website.</summary>
+/// <summary>Guides the human through changing one password on a website, or storing a new service password.</summary>
 internal sealed class RotationDialog : IRotationPrompt
 {
     public bool ConfirmChanged(string reference, string? site, Action copyNew, Action copyOld) => Sta.Run(() =>
@@ -226,9 +226,13 @@ internal sealed class RotationDialog : IRotationPrompt
             "1. Отворете страницата за смяна на паролата на сайта.\r\n" +
             "2. Ако сайтът иска старата парола — „Копирай старата“ и я поставете.\r\n" +
             "3. „Копирай новата“ и я поставете (Ctrl+V) в полетата за нова парола.\r\n" +
+            "   ВНИМАНИЕ: ако Chrome предложи СВОЯ парола („Предложена силна парола“) — НЕ я приемайте.\r\n" +
+            "   Поставете тази от трезора, иначе в сайта и в трезора ще има различни пароли.\r\n" +
             "4. Запазете на сайта. Ако Chrome предложи да обнови паролата в Google — натиснете „Обнови“.\r\n" +
-            "5. Само ако сайтът прие новата парола — „Да, сайтът я прие“.\r\n\r\n" +
-            "The NEW password is in the clipboard. Paste it on the website, save there, then confirm here.\r\n" +
+            "5. Само ако сайтът прие новата парола — „Да, сайтът я прие“.\r\n" +
+            "6. След това излезте и влезте отново в сайта с новата парола — така проверявате, че работи.\r\n\r\n" +
+            "The NEW password is in the clipboard. Do NOT accept a password Chrome suggests; paste this one,\r\n" +
+            "save on the website, confirm here, then log out and in again to test it.\r\n" +
             "Clipboard is cleared when this window closes.";
         var box = new TextBox
         {
@@ -253,6 +257,30 @@ internal sealed class RotationDialog : IRotationPrompt
         form.Controls.Add(panel);
         form.CancelButton = no;
         form.Shown += (_, _) => { neu.Focus(); box.SelectionLength = 0; };
+        return form.ShowDialog() == DialogResult.OK;
+    });
+
+    public bool ConfirmServiceSave(string reference, string reason) => Sta.Run(() =>
+    {
+        Application.EnableVisualStyles();
+        using var form = ConsentDialog.NewForm("Shinkansen Vault — нова парола за услуга / new service password", 600, 320);
+        var text =
+            $"Тайна / Secret:  {reference}\r\n" +
+            $"Причина / Reason:  {reason}\r\n\r\n" +
+            "Новата парола ще бъде приложена от скрипт; не я поставяйте никъде.\r\n" +
+            "Старата стойност остава запазена в трезора като „предишна“.\r\n\r\n" +
+            "A script will apply the new password; do not paste it anywhere.\r\n" +
+            "The old value stays in the vault as the previous one.";
+        var box = new TextBox
+        {
+            Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Dock = DockStyle.Fill,
+            Font = new Font(FontFamily.GenericSansSerif, 10), Text = text,
+        };
+        var no = new Button { Text = "Откажи / Cancel", DialogResult = DialogResult.Cancel, Width = 160, Height = 34 };
+        var yes = new Button { Text = "Запиши новата стойност в трезора", DialogResult = DialogResult.OK, Width = 280, Height = 34 };
+        ConsentDialog.AddButtons(form, box, no, yes);
+        form.CancelButton = no;
+        form.Shown += (_, _) => { yes.Focus(); box.SelectionLength = 0; };
         return form.ShowDialog() == DialogResult.OK;
     });
 }

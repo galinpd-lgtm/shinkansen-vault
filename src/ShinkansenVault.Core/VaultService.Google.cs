@@ -200,16 +200,19 @@ public sealed partial class VaultService
     // ---------- rotate ----------
 
     /// <summary>
-    /// Generates a strong new password, puts it in the clipboard for the human to paste on the website,
-    /// and stores it only after the human confirms the website accepted it. The old value is kept as Previous.
+    /// Generates a strong new password and stores it only after the human confirms. The old value is kept as Previous.
+    /// Website (default): the new value goes to the clipboard for the human to paste on the site.
+    /// Service (<paramref name="forService"/>): nothing goes to the clipboard; a script applies the value afterwards (vault_run).
     /// </summary>
-    public async Task<bool> RotateAsync(VaultRef reference, string reason, IClipboard clipboard, IRotationPrompt prompt, int length = 20)
+    public async Task<bool> RotateAsync(VaultRef reference, string reason, IClipboard clipboard, IRotationPrompt prompt, int length = 20, bool forService = false)
     {
         RequireReason(reason);
         var vault = VaultFile.Load(_vaultPath);
         var entry = vault.Find(reference) ?? throw new VaultException("Unknown reference: " + reference);
         var request = new ConsentRequest("rotate", new[] { reference.ToString() },
-            "нова парола в клипборда → поставяте я на сайта / new password in clipboard → you paste it on the website", reason);
+            forService
+                ? "нова парола → трезора; скрипт ще я приложи, не се поставя никъде / new password → vault; a script applies it, nothing to paste"
+                : "нова парола в клипборда → поставяте я на сайта / new password in clipboard → you paste it on the website", reason);
         var masterKey = await UnlockAsync(vault, request, askConsent: true);
         string? oldValue = null;
         var newValue = PasswordCheck.Generate(length);
@@ -219,19 +222,25 @@ public sealed partial class VaultService
             var plain = VaultCrypto.Open(masterKey, Convert.FromBase64String(entry.Data), vault.EntryAad(entry.Ref));
             try { oldValue = Encoding.UTF8.GetString(plain); }
             finally { VaultCrypto.Zero(plain); }
-            var site = OpenMeta(vault, masterKey, entry)?.Url;
-
-            clipboard.SetText(newValue);
             bool confirmed;
-            try
+            if (forService)
             {
-                var old = oldValue;
-                confirmed = prompt.ConfirmChanged(reference.ToString(), site, () => clipboard.SetText(newValue), () => clipboard.SetText(old));
+                confirmed = prompt.ConfirmServiceSave(reference.ToString(), reason);
             }
-            finally
+            else
             {
-                clipboard.ClearIfEquals(newValue);
-                clipboard.ClearIfEquals(oldValue);
+                var site = OpenMeta(vault, masterKey, entry)?.Url;
+                clipboard.SetText(newValue);
+                try
+                {
+                    var old = oldValue;
+                    confirmed = prompt.ConfirmChanged(reference.ToString(), site, () => clipboard.SetText(newValue), () => clipboard.SetText(old));
+                }
+                finally
+                {
+                    clipboard.ClearIfEquals(newValue);
+                    clipboard.ClearIfEquals(oldValue);
+                }
             }
 
             if (confirmed)
@@ -258,7 +267,7 @@ public sealed partial class VaultService
         {
             VaultCrypto.Zero(masterKey);
         }
-        _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, "rotate", new[] { reference.ToString() }, "website", reason,
+        _audit.Append(new AuditEntry(DateTimeOffset.UtcNow, "rotate", new[] { reference.ToString() }, forService ? "service" : "website", reason,
             saved ? "approved" : "denied", saved ? "new password saved" : "human did not confirm; old password kept"));
         return saved;
     }
